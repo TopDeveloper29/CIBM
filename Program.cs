@@ -6,7 +6,7 @@ using NAudio.Wave;
 
 namespace CIBM
 {
-    class Program
+    public class Program
     {
         enum StreamingPlaybackState
         {
@@ -24,7 +24,7 @@ namespace CIBM
         private static VolumeWaveProvider16 volumeProvider;
 
 
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             string url = "https://stream.statsradio.com:8050/stream";
 
