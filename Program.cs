@@ -26,43 +26,47 @@ namespace CIBM
 
         public static void Main(string[] args)
         {
-            var url = "https://stream.statsradio.com:8050/stream";
-
-            playbackState = StreamingPlaybackState.Stopped;
-            StartStreaming(url);
+            playbackState = StreamingPlaybackState.Buffering;
+            ThreadPool.QueueUserWorkItem(StreamMp3, "https://stream.statsradio.com:8050/stream");
 
             //Press 'P' to pause, 'R' to resume, 'S' to stop.";
             while (true)
             {
-                Console.WriteLine("Enter command\n\np: pause\nr: resume\ns: stop\niv: Increase volume\ndv: Decrease volume):");
+                //Console.WriteLine("Enter command\n\np: pause\nr: resume\ns: stop\niv: Increase volume\ndv: Decrease volume\nstate: Get stream play status):");
                 var key = Console.ReadLine()?.Trim().ToLower();
                 Console.Clear();
-                switch (key.ToLower())
+                if (waveOut != null)
                 {
-                    case "p":
-                        Pause();
-                        break;
-                    case "r":
-                        Resume();
-                        break;
-                    case "iv":
-                        volumeProvider.Volume += 0.15f;
-                        break;
-                    case "dv":
-                        volumeProvider.Volume -= 0.15f;
-                        break;
+                    switch (key.ToLower())
+                    {
+                        case "p":
+                            waveOut.Pause();
+                            playbackState = StreamingPlaybackState.Paused;
+                            break;
+                        case "r":
+                            waveOut.Play();
+                            playbackState = StreamingPlaybackState.Playing;
+                            break;
+                        case "iv":
+                            volumeProvider.Volume += 0.15f;
+                            break;
+                        case "dv":
+                            volumeProvider.Volume -= 0.15f;
+                            break;
+                        case "state":
+                            Console.WriteLine(playbackState);
+                            break;
+                    }
                 }
                 if (key == "s")
                 {
+                    playbackState = StreamingPlaybackState.Stopped;
+                    waveOut?.Stop();
+                    waveOut?.Dispose();
+                    waveOut = null;
                     break;
                 }
             }
-        }
-
-        private static void StartStreaming(string url)
-        {
-            playbackState = StreamingPlaybackState.Buffering;
-            ThreadPool.QueueUserWorkItem(StreamMp3, url);
         }
 
         private static void StreamMp3(object state)
@@ -91,10 +95,7 @@ namespace CIBM
                     do
                     {
                         if (IsBufferNearlyFull)
-                        {
-                            Console.WriteLine("Buffer is full, waiting...");
-                            Thread.Sleep(500);
-                        }
+                        { Thread.Sleep(500); }
                         else
                         {
                             Mp3Frame frame;
@@ -143,67 +144,20 @@ namespace CIBM
             return new AcmMp3FrameDecompressor(waveFormat);
         }
 
-        private static bool IsBufferNearlyFull => bufferedWaveProvider != null &&
-                                                  bufferedWaveProvider.BufferLength - bufferedWaveProvider.BufferedBytes
-                                                  < bufferedWaveProvider.WaveFormat.AverageBytesPerSecond / 4;
+        private static bool IsBufferNearlyFull => bufferedWaveProvider != null && bufferedWaveProvider.BufferLength - bufferedWaveProvider.BufferedBytes < bufferedWaveProvider.WaveFormat.AverageBytesPerSecond / 4;
 
         private static void CreateWaveOut()
         {
             if (waveOut == null && bufferedWaveProvider != null)
             {
                 waveOut = new WaveOut(); // You can also try WaveOutEvent if you have issues
-                waveOut.PlaybackStopped += OnPlaybackStopped;
                 volumeProvider = new VolumeWaveProvider16(bufferedWaveProvider);
                 volumeProvider.Volume = 0.5f; // Ensure volume is at an audible level
                 waveOut.Init(volumeProvider);
                 waveOut.Play();
                 playbackState = StreamingPlaybackState.Playing;
-                Console.WriteLine("Started playing.");
             }
         }
 
-        private static void OnPlaybackStopped(object sender, StoppedEventArgs e)
-        {
-            if (e.Exception != null)
-            {
-                Console.WriteLine($"Playback Error: {e.Exception.Message}");
-            }
-            else
-            {
-                Console.WriteLine("Playback Stopped.");
-            }
-        }
-
-        private static void Pause()
-        {
-            if (waveOut != null)
-            {
-                waveOut.Pause();
-                playbackState = StreamingPlaybackState.Paused;
-                Console.WriteLine("Paused.");
-            }
-        }
-
-        private static void Resume()
-        {
-            if (waveOut != null)
-            {
-                waveOut.Play();
-                playbackState = StreamingPlaybackState.Playing;
-                Console.WriteLine("Resumed.");
-            }
-        }
-
-        private static void StopPlayback()
-        {
-            if (playbackState != StreamingPlaybackState.Stopped)
-            {
-                playbackState = StreamingPlaybackState.Stopped;
-                waveOut?.Stop();
-                waveOut?.Dispose();
-                waveOut = null;
-                Console.WriteLine("Stopped.");
-            }
-        }
     }
 }
