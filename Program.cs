@@ -26,7 +26,7 @@ namespace CIBM
 
         static void Main(string[] args)
         {
-            string url = "https://stream.statsradio.com:8050/stream";
+            var url = "https://stream.statsradio.com:8050/stream";
 
             playbackState = StreamingPlaybackState.Stopped;
             StartStreaming(url);
@@ -34,28 +34,27 @@ namespace CIBM
             //Press 'P' to pause, 'R' to resume, 'S' to stop.";
             while (true)
             {
-                Console.WriteLine("Enter command (p: pause, r: resume, s: stop):");
+                Console.WriteLine("Enter command\n\np: pause\nr: resume\ns: stop\niv: Increase volume\ndv: Decrease volume):");
                 var key = Console.ReadLine()?.Trim().ToLower();
-
-                if (key == "p" && playbackState == StreamingPlaybackState.Playing)
+                Console.Clear();
+                switch (key.ToLower())
                 {
-                    Pause();
-                    Console.WriteLine("Playback paused.");
+                    case "p":
+                        Pause();
+                        break;
+                    case "r":
+                        Resume();
+                        break;
+                    case "iv":
+                        volumeProvider.Volume += 0.15f;
+                        break;
+                    case "dv":
+                        volumeProvider.Volume -= 0.15f;
+                        break;
                 }
-                else if (key == "r" && playbackState == StreamingPlaybackState.Paused)
+                if (key == "s")
                 {
-                    Resume();
-                    Console.WriteLine("Playback resumed.");
-                }
-                else if (key == "s")
-                {
-                    StopPlayback();
-                    Console.WriteLine("Playback stopped.");
                     break;
-                }
-                else
-                {
-                    Console.WriteLine("Invalid command. Please enter 'p', 'r', or 's'.");
                 }
             }
         }
