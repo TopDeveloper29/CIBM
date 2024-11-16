@@ -7,7 +7,7 @@ It alow to stream CIBM 107.1 radio from a console app:
 Allowing request to http://XXX.XXX.XXX.XXX:80 to control the radio stream
 | Path | Description |
 | ---- | ------- |
-| /PlayPause | Play or pause the audio output (when play it resume where you stop it) |
+| /PlayPause | Play or pause the stream |
 | /GetState | Get current status of server |
 | /GetVolume | Get the volume in % |
 | /SetVolume?percent=XXX | Set the volume in % |
