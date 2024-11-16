@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
+using System.Media;
 using System.Net.Http;
 using System.Threading;
 using NAudio.Wave;
@@ -11,9 +13,9 @@ namespace CIBM
         enum StreamingPlaybackState
         {
             Stopped,
-            Playing,
+            Play,
             Buffering,
-            Paused
+            Pause
         }
 
         private static BufferedWaveProvider bufferedWaveProvider;
@@ -22,51 +24,108 @@ namespace CIBM
         private static volatile bool fullyDownloaded;
         private static HttpClient httpClient;
         private static VolumeWaveProvider16 volumeProvider;
-
+        private static bool Alarma = false;
 
         public static void Main(string[] args)
         {
-            playbackState = StreamingPlaybackState.Buffering;
-            ThreadPool.QueueUserWorkItem(StreamMp3, "https://stream.statsradio.com:8050/stream");
-
-            //Press 'P' to pause, 'R' to resume, 'S' to stop.";
-            while (true)
+            try
             {
-                //Console.WriteLine("Enter command\n\np: pause\nr: resume\ns: stop\niv: Increase volume\ndv: Decrease volume\nstate: Get stream play status):");
-                var key = Console.ReadLine()?.Trim().ToLower();
-                Console.Clear();
-                if (waveOut != null)
+                playbackState = StreamingPlaybackState.Buffering;
+                ThreadPool.QueueUserWorkItem(StreamMp3, "https://stream.statsradio.com:8050/stream");
+
+                //Press 'P' to pause, 'R' to resume, 'S' to stop.";
+                while (true)
                 {
-                    switch (key.ToLower())
+                    //Console.WriteLine("Enter command\n\np: pause\nr: resume\ns: stop\v: Set volume in %\nstate:Get stream play status):");
+                    var key = Console.ReadLine()?.Trim().ToLower();
+                    if (waveOut != null)
                     {
-                        case "p":
-                            waveOut.Pause();
-                            playbackState = StreamingPlaybackState.Paused;
+                        switch (key)
+                        {
+                            case "a":
+                                Alarma = true;
+                                if (playbackState == StreamingPlaybackState.Play)
+                                {
+                                    waveOut.Pause();
+                                }
+                                Properties.Resources.alert.Position = 0; // Assurez-vous que la position du flux est au début
+
+                                using (WaveFileReader reader = new WaveFileReader(Properties.Resources.alert))
+                                using (WaveOutEvent outputDevice = new WaveOutEvent())
+                                {
+                                    outputDevice.PlaybackStopped += (s, e) =>
+                                    {
+                                        if (Alarma)
+                                        {
+                                            reader.Position = 0; // Réinitialisez la position pour rejouer
+                                            outputDevice.Play(); // Rejoue l'audio
+                                        }
+                                    };
+
+                                    outputDevice.Init(reader);
+                                    outputDevice.Play();
+
+                                    var v = Console.ReadLine();
+                                    while (v.Contains("gv") || v.Contains("state"))
+                                    {
+                                        v = Console.ReadLine();
+                                    }
+                                    
+                                     Alarma = false;
+                                }
+                                break;
+                            case "p":
+                                if (!Alarma)
+                                {
+
+                                    if (playbackState == StreamingPlaybackState.Play)
+                                    {
+                                        waveOut.Pause();
+                                        playbackState = StreamingPlaybackState.Pause;
+                                    }
+                                    else
+                                    {
+                                        waveOut.Play();
+                                        playbackState = StreamingPlaybackState.Play;
+                                    }
+                                }
+                                Console.WriteLine(playbackState);
+                                break;
+                            case "v":
+                                var volpercent = Console.ReadLine()?.Trim().ToLower();
+                                if (float.TryParse(volpercent, out var Volume))
+                                {
+                                    volumeProvider.Volume = (Volume / 50);
+                                    Console.WriteLine(volumeProvider.Volume * 50);
+                                }
+                                else
+                                {
+                                    Console.WriteLine("50");
+                                }
+                                break;
+                            case "gv":
+                                Console.WriteLine(volumeProvider.Volume * 50);
+                                break;
+                            case "state":
+                                Console.WriteLine(playbackState);
+                                break;
+                        }
+
+                        if (key == "s")
+                        {
+                            if (!Alarma)
+                            {
+                                playbackState = StreamingPlaybackState.Stopped;
+                                waveOut?.Stop();
+                                waveOut?.Dispose();
+                                waveOut = null;
+                            }
                             break;
-                        case "r":
-                            waveOut.Play();
-                            playbackState = StreamingPlaybackState.Playing;
-                            break;
-                        case "iv":
-                            volumeProvider.Volume += 0.15f;
-                            break;
-                        case "dv":
-                            volumeProvider.Volume -= 0.15f;
-                            break;
-                        case "state":
-                            Console.WriteLine(playbackState);
-                            break;
+                        }
                     }
                 }
-                if (key == "s")
-                {
-                    playbackState = StreamingPlaybackState.Stopped;
-                    waveOut?.Stop();
-                    waveOut?.Dispose();
-                    waveOut = null;
-                    break;
-                }
             }
+            catch(Exception e) { Console.WriteLine(e); File.AppendAllText($"{AppDomain.CurrentDomain.BaseDirectory}\\CIBM.log", $"{DateTime.Now}\n{e}"); }
         }
 
         private static void StreamMp3(object state)
@@ -155,7 +214,7 @@ namespace CIBM
                 volumeProvider.Volume = 0.5f; // Ensure volume is at an audible level
                 waveOut.Init(volumeProvider);
                 waveOut.Play();
-                playbackState = StreamingPlaybackState.Playing;
+                playbackState = StreamingPlaybackState.Play;
             }
         }
 
